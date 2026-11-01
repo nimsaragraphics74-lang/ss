@@ -28,5 +28,35 @@ const gallery=document.querySelector('.gallery'),empty=document.createElement('d
 document.querySelectorAll('.faq-item>button').forEach(b=>b.onclick=()=>{let open=b.getAttribute('aria-expanded')==='true';document.querySelectorAll('.faq-item>button').forEach(x=>{x.setAttribute('aria-expanded','false');x.querySelector('span').textContent='+';x.nextElementSibling.classList.remove('expanded');x.nextElementSibling.setAttribute('aria-hidden','true')});if(!open){b.setAttribute('aria-expanded','true');b.querySelector('span').textContent='−';b.nextElementSibling.classList.add('expanded');b.nextElementSibling.setAttribute('aria-hidden','false')}});
 const menu=document.querySelector('.mobile'),nav=document.querySelector('nav');function shut(){nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.textContent='☰'}menu.onclick=()=>{let open=nav.classList.toggle('open');menu.setAttribute('aria-expanded',String(open));menu.textContent=open?'✕':'☰'};nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',shut));
 if('IntersectionObserver'in window){const ob=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('revealed');ob.unobserve(e.target)}}),{threshold:.08});document.querySelectorAll('.reveal').forEach(el=>ob.observe(el))}
+// Public content is read-only. Owner authentication stays on the studio server.
+const studioOrigin='https://nimzara-photography-studio.doublemoose.chatgpt.site';
+let contentVersion='';
+function applyPublicContent(next){
+ if(!next||typeof next.name!=='string'||!Array.isArray(next.packages)||next.packages.length!==3||!Array.isArray(next.gallery))return;
+ const version=JSON.stringify(next);if(version===contentVersion||overlay)return;
+ const safeGallery=next.gallery.filter(g=>g&&typeof g.url==='string'&&['Portraits','Weddings','Birthdays','Events'].includes(g.category)&&(/^(?:\/images\/|\/media\/)/.test(g.url)||/^https:\/\//.test(g.url))).map(g=>({...g,url:new URL(g.url,studioOrigin).href}));
+ Object.assign(d,next,{gallery:safeGallery});contentVersion=version;
+ const brand=document.querySelector('header .brand>span:last-child');if(brand)brand.innerHTML=esc(d.name.toUpperCase())+'<small>PHOTOGRAPHY & STUDIO</small>';
+ document.querySelector('.story-art h3').textContent=d.name;
+ document.querySelector('.story-art em').textContent=d.tagline;
+ document.querySelector('#story>div:last-child h2').textContent=d.intro;
+ document.querySelector('#story>div:last-child>p').textContent=d.about;
+ document.querySelector('footer .brand').textContent='◎ '+d.name.toUpperCase();
+ document.querySelector('footer>span').textContent=d.tagline;
+ document.querySelector('footer>small').textContent='© '+new Date().getFullYear()+' '+d.name+' Photography & Studio';
+ document.querySelector('.contact-detail').textContent=d.name.toUpperCase()+' PHOTOGRAPHY & STUDIO · '+d.tagline.toUpperCase();
+ document.querySelectorAll('a[href^="tel:"]').forEach(a=>{a.href='tel:'+d.phone;a.textContent=d.phone});
+ document.querySelectorAll('a[href^="https://wa.me/"]').forEach(a=>{const message=new URL(a.href).searchParams.get('text')||'Hi, I would like to book a session.';a.href=wa(message)});
+ document.querySelector('.packages').innerHTML=d.packages.map((p,i)=>'<article class="package '+(i===2?'featured':'')+'">'+(i===2?'<div class="best">✧ THE COMPLETE EXPERIENCE</div>':'')+'<div class="package-number">0'+(i+1)+'<span>'+['THE BEGINNING','A LITTLE MORE','THE FULL STORY'][i]+'</span></div><div class="package-symbol">'+['◇','✧','♔'][i]+'</div><h3>'+esc(p.name)+'</h3><p class="package-desc">'+['Your beautiful first chapter.','More moments. More to cherish.','For memories that deserve it all.'][i]+'</p><div class="price"><small>LKR</small> '+Number(p.price).toLocaleString()+'<span>/ session</span></div><div class="package-line"></div><ul><li><b>'+Number(p.photos)+'</b> professionally edited photos</li>'+String(p.extra).split(' · ').map(v=>'<li>'+esc(v)+'</li>').join('')+'<li>Creative editing & finishing</li></ul><button class="'+(i===2?'gold':'outline')+'">CHOOSE '+esc(p.name.toUpperCase())+' <span>↗</span></button><small class="package-foot">A personal experience, from start to finish.</small></article>').join('');
+ document.querySelectorAll('.package>button').forEach((b,i)=>b.onclick=()=>book(i));
+ gallery.innerHTML=d.gallery.map((g,i)=>'<button class="gallery-item" data-gallery-index="'+i+'"><img loading="lazy" src="'+esc(g.url)+'" alt="'+esc(g.title)+'"><span><small>'+esc(g.category.toUpperCase())+'</small><strong>'+esc(g.title)+'</strong><b>↗</b></span><div class="gallery-open">VIEW STORY ↗</div></button>').join('');
+ gallery.querySelectorAll('.gallery-item').forEach((b,i)=>b.onclick=()=>photo(i));
+ document.querySelector('.filters sup').textContent=String(d.gallery.length).padStart(2,'0');
+ const filterButtons=[...document.querySelectorAll('.filters button')];const active=filterButtons.find(b=>b.getAttribute('aria-pressed')==='true');(active||filterButtons[0]).click();
+ document.documentElement.dataset.contentSource='studio';
+}
+async function syncPublicContent(){try{const response=await fetch(studioOrigin+'/api/content',{mode:'cors',credentials:'omit',cache:'no-store'});if(response.ok)applyPublicContent(await response.json())}catch{/* Keep the embedded website available when the studio server is unreachable. */}}
+syncPublicContent();window.addEventListener('focus',syncPublicContent);
+
 })();
 </script></body></html>
