@@ -71,8 +71,25 @@ function applyPublicContent(next){
  const filterButtons=[...document.querySelectorAll('.filters button')];const active=filterButtons.find(b=>b.getAttribute('aria-pressed')==='true');(active||filterButtons[0]).click();
  document.documentElement.dataset.contentSource='studio';
 }
-async function syncPublicContent(){try{const response=await fetch(studioOrigin+'/api/content',{mode:'cors',credentials:'omit',cache:'no-store'});if(response.ok)applyPublicContent(await response.json())}catch{/* Keep the embedded website available when the studio server is unreachable. */}}
-syncPublicContent();window.addEventListener('focus',syncPublicContent);
+let syncInFlight=false,queuedPublicContent=null;
+async function syncPublicContent(){
+ if(syncInFlight||document.visibilityState==='hidden')return;
+ syncInFlight=true;
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),12000);
+ try{
+  const response=await fetch(studioOrigin+'/api/content?updated='+Date.now(),{mode:'cors',credentials:'omit',cache:'no-store',signal:controller.signal});
+  if(!response.ok)throw new Error('Content unavailable');
+  const next=await response.json();
+  if(overlay)queuedPublicContent=next;else{applyPublicContent(next);queuedPublicContent=null;}
+  document.documentElement.dataset.syncStatus='current';
+ }catch{document.documentElement.dataset.syncStatus='retrying';}
+ finally{clearTimeout(timeout);syncInFlight=false;}
+}
+syncPublicContent();
+window.addEventListener('focus',syncPublicContent);
+window.addEventListener('pageshow',syncPublicContent);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncPublicContent()});
+setInterval(()=>{if(queuedPublicContent&&!overlay){applyPublicContent(queuedPublicContent);queuedPublicContent=null;}syncPublicContent()},10000);
 
 })();
 </script></body></html>
